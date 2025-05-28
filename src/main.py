@@ -1,5 +1,8 @@
 import cv2
 import mediapipe as mp
+import math
+import time
+
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
@@ -10,12 +13,56 @@ mp_hands = mp.solutions.hands
 # Sound lib: https://python-sounddevice.readthedocs.io/en/0.5.1/examples.html - to generate sine wave on the fly 
 # Use sine by default, but allow overwriting with custom waves. read from sample array instead of generating, and loop. pitch altered by sample rate.
 
+# Potentially use mediapipe solely for left hand gestures, and track a colour for pitch. any coloured object can be used, eg a green card, etc. will improve speed at which pitch can change!
+
+# Takes mediapipe results, which hand (inverted), and a threshold for normalised distance to count as a pinch. True if pinch, False if open, None if no hands detected
+def detectPinching(results, hand, threshold):
+
+  if not results.multi_hand_landmarks or not results.multi_handedness:
+    return None  # No hands detected
+
+  for handLabel, handLandmarks in zip(results.multi_handedness, results.multi_hand_landmarks):
+
+    label = handLabel.classification[0].label.lower()
+
+    if label == hand:
+
+      thumbTip = handLandmarks.landmark[4]
+      indexTip = handLandmarks.landmark[8]
+      wrist = handLandmarks.landmark[0] # Base of wrist
+      mcp = handLandmarks.landmark[9] # Base of middle finger
+
+      pinchDistance = distance3d(thumbTip, indexTip)
+      handSize = distance3d(wrist, mcp)
+
+      # Normalise pinch distance based on handsize
+      normalisedPinchDistance = pinchDistance / handSize
+
+      if normalisedPinchDistance < threshold:
+        return True
+      else:
+        return False
+  
+def distance3d(landmark1, landmark2):
+  dx = landmark1.x - landmark2.x
+  dy = landmark1.y - landmark2.y
+  dz = landmark1.z - landmark2.z
+  distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+  return distance
+    
+pinchCounter = 0
+notPinchCounter = 0
+pinching = False
+
+prevTime = 0
 
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 with mp_hands.Hands(
-    model_complexity=1,
+    max_num_hands=1,
+    model_complexity=0,
     min_detection_confidence=0.4,
     min_tracking_confidence=0.4) as hands:
   while cap.isOpened():
@@ -44,15 +91,43 @@ with mp_hands.Hands(
             mp_drawing_styles.get_default_hand_connections_style())
     else:
       print("no hand detected")
+
+    pinchDetected = detectPinching(results, "right", 0.18)
+
+    # Possibility of debounce, but makes it unresponsive
+    if pinchDetected == True: # actually left, inverted
+      pinchCounter += 1
+      notPinchCounter = 0
+      if (pinchCounter >= 1):
+        pinching = True
+        notPinchCounter = 0
+    elif pinchDetected == False:
+      notPinchCounter += 1
+      pinchCounter = 0
+      if (notPinchCounter >= 1):
+        pinching = False
+        pinchCounter = 0
+    else:
+      pass
+
+    currTime = time.time()
+    fps = 1/ (currTime - prevTime)
+    prevTime = currTime
+
+    image = cv2.flip(image, 1)
+
+    cv2.putText(image, f'FPS: {int(fps)}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    if pinching:
+      cv2.circle(image, (30, 50), 8, (0, 0, 255), -1)
+
     # Flip the image horizontally for a selfie-view display.
-    cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
+    cv2.imshow('MediaPipe Hands', image)
     if cv2.waitKey(5) & 0xFF == 27:
       break
 
-    # detectPinching(results)
+
 cap.release()
 
-# def detectPinching(results):
-#   if results.left_hand_landmarks.
+
 
 
