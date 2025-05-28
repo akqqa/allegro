@@ -4,6 +4,13 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 
+# PLAN: first hand controls play/dont play
+# Second hand controls pitch. 
+
+# Sound lib: https://python-sounddevice.readthedocs.io/en/0.5.1/examples.html - to generate sine wave on the fly 
+# Use sine by default, but allow overwriting with custom waves. read from sample array instead of generating, and loop. pitch altered by sample rate.
+
+
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -41,4 +48,11 @@ with mp_hands.Hands(
     cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
     if cv2.waitKey(5) & 0xFF == 27:
       break
+
+    # detectPinching(results)
 cap.release()
+
+# def detectPinching(results):
+#   if results.left_hand_landmarks.
+
+
