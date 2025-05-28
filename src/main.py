@@ -7,6 +7,12 @@ mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
 
+DEBOUNCE_THRESHOLD = 2
+MAX_HANDS = 1
+MODEL_COMPLEXITY = 0
+MIN_DETECTION_CONFIDENCE = 0.6
+MIN_TRACKING_CONFIDENCE = 0.4
+
 # PLAN: first hand controls play/dont play
 # Second hand controls pitch. 
 
@@ -61,10 +67,10 @@ cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 with mp_hands.Hands(
-    max_num_hands=1,
-    model_complexity=0,
-    min_detection_confidence=0.4,
-    min_tracking_confidence=0.4) as hands:
+    max_num_hands=MAX_HANDS,
+    model_complexity=MODEL_COMPLEXITY,
+    min_detection_confidence=MIN_DETECTION_CONFIDENCE,
+    min_tracking_confidence=MIN_TRACKING_CONFIDENCE) as hands:
   while cap.isOpened():
     success, image = cap.read()
     if not success:
@@ -89,8 +95,6 @@ with mp_hands.Hands(
             mp_hands.HAND_CONNECTIONS,
             mp_drawing_styles.get_default_hand_landmarks_style(),
             mp_drawing_styles.get_default_hand_connections_style())
-    else:
-      print("no hand detected")
 
     pinchDetected = detectPinching(results, "right", 0.18)
 
@@ -98,13 +102,13 @@ with mp_hands.Hands(
     if pinchDetected == True: # actually left, inverted
       pinchCounter += 1
       notPinchCounter = 0
-      if (pinchCounter >= 1):
+      if (pinchCounter >= DEBOUNCE_THRESHOLD):
         pinching = True
         notPinchCounter = 0
     elif pinchDetected == False:
       notPinchCounter += 1
       pinchCounter = 0
-      if (notPinchCounter >= 1):
+      if (notPinchCounter >= DEBOUNCE_THRESHOLD):
         pinching = False
         pinchCounter = 0
     else:
