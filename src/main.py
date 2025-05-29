@@ -17,13 +17,13 @@ MIN_TRACKING_CONFIDENCE = 0.8
 
 PINCH_THRESHOLD = 0.6
 
-FREQUENCY = 440
+frequency = 440
 AMPLITUDE = 0.2
 SAMPLERATE = 44100
 
 SAMPLES = 1024
 waveform = np.sin(2 * np.pi * np.arange(SAMPLES) / SAMPLES).astype(np.float32)
-step = FREQUENCY * SAMPLES / SAMPLERATE
+step = frequency * SAMPLES / SAMPLERATE
 fade_duration = int(0.01 * SAMPLERATE)
 start_idx = 0
 
@@ -117,6 +117,11 @@ def detectColour(image):
 
   return output
 
+def quantisePitch(y, min=60, max=84):
+  inverted = 1-y
+  float = round(min + inverted*(max-min))
+  return 440.0 * (2 ** ((float - 69) / 12))
+  
 
     
 pinchCounter = 0
@@ -136,6 +141,8 @@ with mp_hands.Hands(
   
   soundStream = sd.OutputStream(channels=1, callback=sineCallback, samplerate=SAMPLERATE, blocksize=256, latency=0.035)
 
+  index_y = 0
+
   while cap.isOpened():
     success, image = cap.read()
     if not success:
@@ -149,9 +156,6 @@ with mp_hands.Hands(
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = hands.process(image)
 
-    #detectColour(image)
-
-
     # Draw the hand annotations on the image.
     image.flags.writeable = True
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
@@ -163,6 +167,11 @@ with mp_hands.Hands(
             mp_hands.HAND_CONNECTIONS,
             mp_drawing_styles.get_default_hand_landmarks_style(),
             mp_drawing_styles.get_default_hand_connections_style())
+        index_y = hand_landmarks.landmark[8].y
+
+    # Adjust frequency
+    frequency = quantisePitch(index_y) # make it so quantising is a choice? 
+    step = frequency * SAMPLES / SAMPLERATE
 
     pinchDetected = detectPinching(results, "left", PINCH_THRESHOLD)
 
@@ -182,10 +191,6 @@ with mp_hands.Hands(
     else:
       pass
 
-
-    # Generate a sine wave
-
-
     currTime = time.time()
     fps = 1/ (currTime - prevTime)
     prevTime = currTime
@@ -193,6 +198,8 @@ with mp_hands.Hands(
     image = cv2.flip(image, 1)
 
     cv2.putText(image, f'FPS: {int(fps)}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    # Draw circle and create sound
     if pinching:
       cv2.circle(image, (30, 50), 8, (0, 0, 255), -1)
       if not soundStream.active:
@@ -204,7 +211,7 @@ with mp_hands.Hands(
         start_idx = 0
 
     # Flip the image horizontally for a selfie-view display.
-    cv2.imshow('MediaPipe Hands', image)
+    cv2.imshow('Allegro', image)
     if cv2.waitKey(5) & 0xFF == 27:
       break
 
