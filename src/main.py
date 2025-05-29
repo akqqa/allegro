@@ -10,8 +10,10 @@ mp_hands = mp.solutions.hands
 DEBOUNCE_THRESHOLD = 2
 MAX_HANDS = 1
 MODEL_COMPLEXITY = 0
-MIN_DETECTION_CONFIDENCE = 0.6
-MIN_TRACKING_CONFIDENCE = 0.4
+MIN_DETECTION_CONFIDENCE = 0.8
+MIN_TRACKING_CONFIDENCE = 0.8
+
+PINCH_THRESHOLD = 0.6
 
 # PLAN: first hand controls play/dont play
 # Second hand controls pitch. 
@@ -36,7 +38,7 @@ def detectPinching(results, hand, threshold):
       thumbTip = handLandmarks.landmark[4]
       indexTip = handLandmarks.landmark[8]
       wrist = handLandmarks.landmark[0] # Base of wrist
-      mcp = handLandmarks.landmark[9] # Base of middle finger
+      mcp = handLandmarks.landmark[1] # Base of thumb
 
       pinchDistance = distance3d(thumbTip, indexTip)
       handSize = distance3d(wrist, mcp)
@@ -64,8 +66,8 @@ pinching = False
 prevTime = 0
 
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+# cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+# cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 with mp_hands.Hands(
     max_num_hands=MAX_HANDS,
     model_complexity=MODEL_COMPLEXITY,
@@ -96,7 +98,7 @@ with mp_hands.Hands(
             mp_drawing_styles.get_default_hand_landmarks_style(),
             mp_drawing_styles.get_default_hand_connections_style())
 
-    pinchDetected = detectPinching(results, "right", 0.18)
+    pinchDetected = detectPinching(results, "right", PINCH_THRESHOLD)
 
     # Possibility of debounce, but makes it unresponsive
     if pinchDetected == True: # actually left, inverted
