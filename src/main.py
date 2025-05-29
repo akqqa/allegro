@@ -81,6 +81,43 @@ def sineCallback(outdata, frames, time, status):
 
   outdata[:] = out
 
+# From https://stackoverflow.com/questions/44588279/find-and-draw-the-largest-contour-in-opencv-on-a-specific-color-python
+def detectColour(image):
+  hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+  # Define HSV range for orange
+  lower = np.array([10, 20, 20])
+  upper = np.array([30, 255, 255])
+
+  # find the colors within the specified boundaries and apply
+  # the mask
+  mask = cv2.inRange(hsv, lower, upper)
+  output = cv2.bitwise_and(image, image, mask=mask)
+
+  ret,thresh = cv2.threshold(mask, 40, 255, 0)
+  major_version = int(cv2.__version__.split('.')[0])
+  if major_version >= 4:
+      contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+  else:
+      _, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+  if len(contours) != 0:
+    # draw in blue the contours that were founded
+    cv2.drawContours(output, contours, -1, (255, 0, 0), 3)  # Blue
+
+    # find the biggest countour (c) by the area
+    c = max(contours, key = cv2.contourArea)
+    x,y,w,h = cv2.boundingRect(c)
+
+    # draw the biggest contour (c) in green
+    cv2.rectangle(output,(x,y),(x+w,y+h),(0,255,0),2)
+  
+  # show the images
+  cv2.imshow("Result", np.hstack([image, output]))
+
+  return output
+
+
     
 pinchCounter = 0
 notPinchCounter = 0
@@ -112,6 +149,9 @@ with mp_hands.Hands(
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = hands.process(image)
 
+    #detectColour(image)
+
+
     # Draw the hand annotations on the image.
     image.flags.writeable = True
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
@@ -124,10 +164,10 @@ with mp_hands.Hands(
             mp_drawing_styles.get_default_hand_landmarks_style(),
             mp_drawing_styles.get_default_hand_connections_style())
 
-    pinchDetected = detectPinching(results, "right", PINCH_THRESHOLD)
+    pinchDetected = detectPinching(results, "left", PINCH_THRESHOLD)
 
     # Possibility of debounce, but makes it unresponsive
-    if pinchDetected == True: # actually left, inverted
+    if pinchDetected == True:
       pinchCounter += 1
       notPinchCounter = 0
       if (pinchCounter >= DEBOUNCE_THRESHOLD):
@@ -141,6 +181,7 @@ with mp_hands.Hands(
         pinchCounter = 0
     else:
       pass
+
 
     # Generate a sine wave
 
@@ -157,8 +198,10 @@ with mp_hands.Hands(
       if not soundStream.active:
         soundStream.start()
     else:
+      print(start_idx % SAMPLES)
       if soundStream.active:
         soundStream.stop()
+        start_idx = 0
 
     # Flip the image horizontally for a selfie-view display.
     cv2.imshow('MediaPipe Hands', image)
