@@ -2,6 +2,8 @@ import cv2
 import mediapipe as mp
 import math
 import time
+import numpy as np
+import sounddevice as sd
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -14,6 +16,16 @@ MIN_DETECTION_CONFIDENCE = 0.8
 MIN_TRACKING_CONFIDENCE = 0.8
 
 PINCH_THRESHOLD = 0.6
+
+FREQUENCY = 440
+AMPLITUDE = 0.2
+SAMPLERATE = 44100
+
+SAMPLES = 1024
+waveform = np.sin(2 * np.pi * np.arange(SAMPLES) / SAMPLES).astype(np.float32)
+step = FREQUENCY * SAMPLES / SAMPLERATE
+fade_duration = int(0.01 * SAMPLERATE)
+start_idx = 0
 
 # PLAN: first hand controls play/dont play
 # Second hand controls pitch. 
@@ -58,6 +70,17 @@ def distance3d(landmark1, landmark2):
   distance = math.sqrt(dx*dx + dy*dy + dz*dz)
 
   return distance
+
+def sineCallback(outdata, frames, time, status):
+  global start_idx
+  out = np.zeros((frames, 1), dtype=np.float32)
+
+  for i in range(frames):
+    out[i] = waveform[int(start_idx) % SAMPLES]
+    start_idx += step
+
+  outdata[:] = out
+
     
 pinchCounter = 0
 notPinchCounter = 0
@@ -73,6 +96,9 @@ with mp_hands.Hands(
     model_complexity=MODEL_COMPLEXITY,
     min_detection_confidence=MIN_DETECTION_CONFIDENCE,
     min_tracking_confidence=MIN_TRACKING_CONFIDENCE) as hands:
+  
+  soundStream = sd.OutputStream(channels=1, callback=sineCallback, samplerate=SAMPLERATE, blocksize=256, latency=0.035)
+
   while cap.isOpened():
     success, image = cap.read()
     if not success:
@@ -116,6 +142,9 @@ with mp_hands.Hands(
     else:
       pass
 
+    # Generate a sine wave
+
+
     currTime = time.time()
     fps = 1/ (currTime - prevTime)
     prevTime = currTime
@@ -125,6 +154,11 @@ with mp_hands.Hands(
     cv2.putText(image, f'FPS: {int(fps)}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
     if pinching:
       cv2.circle(image, (30, 50), 8, (0, 0, 255), -1)
+      if not soundStream.active:
+        soundStream.start()
+    else:
+      if soundStream.active:
+        soundStream.stop()
 
     # Flip the image horizontally for a selfie-view display.
     cv2.imshow('MediaPipe Hands', image)
